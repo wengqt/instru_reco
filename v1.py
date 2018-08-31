@@ -10,7 +10,7 @@ kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT, (80, 80))
 kernel3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 kernel4 = cv2.getStructuringElement(cv2.MORPH_RECT, (4, 4))
 kernel5 = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
-kernel6 = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+kernel6 = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
 
 
 def findContours(findContoursImg,dstCanny,heartsarr=None,dst=None,offset1=0,offset2=0,big_index=0):
@@ -297,7 +297,7 @@ def processNonPointer(non_p,cut_mask,one_heart):
     cv2.imwrite('./v1/nums_canny1_non.jpg', numsCanny_non)
     line_border_, ho = getLineBorder(numsCanny_non, 20)
     kedu_ = numsCanny_non[line_border_[0]:line_border_[1], :]
-    print(ho)
+    # print(ho)
     return numsShape,polar_,line_border_,kedu_,numsCanny_non,ho
 
 
