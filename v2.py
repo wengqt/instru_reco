@@ -3,6 +3,9 @@ import numpy as np
 import math
 import peakdetective
 import softmax
+from keras.models import load_model
+
+from keras import backend as K
 from PIL import Image
 
 kernel1 = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 50))
@@ -128,7 +131,7 @@ def findHearts(src,org):
     # polar = cv2.rotate(polar, cv2.ROTATE_90_COUNTERCLOCKWISE)
     # cv2.imwrite('./v1/cut_polar.jpg', polar)
 
-    return [circles2[0][1],circles2[0][2]]
+    return [circles2[0][1],circles2[0][2]],circles2[0]
 
 
 
@@ -280,21 +283,21 @@ def getNonPointer(cutImg,pointerImg):
     return non_p
 
 
-def processNonPointer(non_p,cut_mask,one_heart):
-    unused, non_numZone_adp, unused = findContours(cut_mask, non_p, offset1=85, offset2=70)
-    zoneshape = non_numZone_adp.shape
-    non_numZone_adp = cv2.resize(non_numZone_adp, (zoneshape[1] * 8, zoneshape[0] * 8))
-    cv2.imwrite('./v1/cut_non_numZoneCanny.jpg', non_numZone_adp)
+def processNonPointer(non_p,one_heart):
+    # unused, non_numZone_adp, unused = findContours(cut_mask, non_p, offset1=85, offset2=70)
+    zoneshape = non_p.shape
+    non_numZone_adp = cv2.resize(non_p, (zoneshape[1] * 8, zoneshape[0] * 8))
+    cv2.imwrite('./v1/x_cut_non_numZoneCanny.jpg', non_numZone_adp)
     polar_ = cv2.logPolar(non_numZone_adp, (one_heart[0] * 8, one_heart[1] * 8), 600, cv2.WARP_FILL_OUTLIERS)
     polar_ = cv2.rotate(polar_, cv2.ROTATE_90_COUNTERCLOCKWISE)
-    cv2.imwrite('./v1/cut_polar_1_non.jpg', polar_)
+    cv2.imwrite('./v1/x_cut_polar_1_non.jpg', polar_)
     unused, numsCanny_non, unused1 = findContours(cv2.dilate(polar_, kernel5, iterations=2), polar_, offset1=40,
                                                   offset2=30, big_index=0)
     numsShape = numsCanny_non.shape
     numsCanny_non = cv2.resize(numsCanny_non, (numsShape[1] * 4, numsShape[0] * 4))
     threshold, numsCanny_non = cv2.threshold(numsCanny_non, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     numsCanny_non = cv2.erode(numsCanny_non,kernel3,iterations=1)
-    cv2.imwrite('./v1/nums_canny1_non.jpg', numsCanny_non)
+    cv2.imwrite('./v1/x_nums_canny1_non.jpg', numsCanny_non)
     line_border_, ho = getLineBorder(numsCanny_non, 20)
     kedu_ = numsCanny_non[line_border_[0]:line_border_[1], :]
     # print(ho)
@@ -304,13 +307,13 @@ def processNonPointer(non_p,cut_mask,one_heart):
 def processSmallKedu(zone2polar,one_heart,numsShape,polar_,line_border_):
     polar = cv2.logPolar(zone2polar, (one_heart[0]*8, one_heart[1]*8), 600, cv2.WARP_FILL_OUTLIERS)
     polar = cv2.rotate(polar, cv2.ROTATE_90_COUNTERCLOCKWISE)
-    cv2.imwrite('./v1/cut_polar_1.jpg',polar)
+    cv2.imwrite('./v1/x_cut_polar_1.jpg',polar)
     unused,numsCanny_1,unused1=findContours(cv2.dilate(polar_,kernel5,iterations=2),polar,offset1=40,offset2=30,big_index=0)
     numsCanny_1 = cv2.resize(numsCanny_1,(numsShape[1]*4,numsShape[0]*4))
-    cv2.imwrite('./v1/nums_canny1.jpg',numsCanny_1)
+    cv2.imwrite('./v1/x_nums_canny1.jpg',numsCanny_1)
     kedu_1_pointer = numsCanny_1[line_border_[0]:line_border_[1]+60,:]
     kedu_1_pointer = cv2.erode(kedu_1_pointer,kernel3)
-    cv2.imwrite('./v1/nums_kedu_1_pointer.jpg',kedu_1_pointer)
+    cv2.imwrite('./v1/x_nums_kedu_1_pointer.jpg',kedu_1_pointer)
     ver_ = projectVertical(kedu_1_pointer)
     (h1, w1) = kedu_1_pointer.shape
     newHorizon_ = np.zeros([h1, w1], np.uint8)
@@ -319,7 +322,7 @@ def processSmallKedu(zone2polar,one_heart,numsShape,polar_,line_border_):
         for j in range(0, ver_[i]):
             newHorizon_[j, i] = 255
 
-    cv2.imwrite('./v1/nums_kedu_111.jpg',newHorizon_)
+    cv2.imwrite('./v1/x_nums_kedu_111.jpg',newHorizon_)
     maxtab,mintab = peakdetective.peakdet(ver_,30)
     # from matplotlib.pyplot import plot, scatter, show
     # plot(ver)
@@ -339,7 +342,7 @@ def processSmallNum(numsCanny_non,line_border_,k_pos,k_len):
     numsimg_ = cv2.erode(numsimg_,kernel5)
 
     numsdilate_ = cv2.dilate(numsimg_,kernel5,iterations=6)
-    cv2.imwrite('./v1/numsimg_.jpg',numsdilate_)
+    cv2.imwrite('./v1/xi_numsimg_.jpg',numsdilate_)
     numsArr_ = getEachNum(numsdilate_,60)[0]
 
 
@@ -356,9 +359,9 @@ def processSmallNum(numsCanny_non,line_border_,k_pos,k_len):
             new_cut=cv2.resize(new_cut,(64,128))
             cv2.imwrite('./v1/nums1/' +str(index_)+'_'+ str(int(i / 2)) + '.jpg', new_cut)
             # new_cut = Image.fromarray(cv2.cvtColor(new_cut, cv2.cv2.COLOR_BGR2GRAY))
-            hight, width = new_cut.shape
-            new_cut = np.asarray(new_cut, dtype='float64') / 256.
-            new_cut = new_cut.reshape(1, hight * width)[0]
+            new_cut = np.asarray(new_cut)
+            # new_cut = new_cut.reshape(1, hight * width)[0]
+
             tmpArr.append(new_cut)
         index_ += 1
         numbers_.append(tmpArr)
@@ -372,9 +375,22 @@ def processSmallNum(numsCanny_non,line_border_,k_pos,k_len):
     for test in testDigits:
         res = ''
         for i in test:
-            predict = slearn.predict(i)
-            res += '-' if str(predict)=='-1' else str(predict)
-        print(res)
+
+
+            x = cv2.resize(i,(32,64))
+            x = x.astype('float32')
+            x /= 255
+            x = x.reshape(1, 64, 32, 1)
+            pr = cnn.predict(x)
+            predict =  convert2Num(pr)
+            print('cnn识别结果：', convert2Num(pr))
+            # i = i.astype('float32')
+            # i /= 255
+            # i = i.reshape(1, 128 * 64)[0]
+            # predict = slearn.predict(i)
+
+            res += '-' if str(predict)=='10' else str(predict)
+        print('识别为：',res)
         kedu_range.append(int(res))
 
     result = k_pos*(k_len-1)/(kedu_range[1]-kedu_range[0])+kedu_range[0]
@@ -409,16 +425,16 @@ def findMainZone(path):
     the_circle = circles[0][0] #投票数最大的圆
     cv2.circle(img1_cp, (the_circle[0], the_circle[1]), the_circle[2], (0, 0, 255), 2)
     cv2.circle(img1_cp, (the_circle[0], the_circle[1]), 2, (0, 0, 255), 3)
-    cv2.imwrite('./v1/circles.jpg', img1_cp)
+    cv2.imwrite('./v1/1_circles.jpg', img1_cp)
 
     cutImg_o = img1[the_circle[1] - the_circle[2]:the_circle[1] + the_circle[2],
                the_circle[0] - the_circle[2]:the_circle[0] + the_circle[2]]
-    cv2.imwrite('./v1/cut.jpg', cutImg_o)
+    cv2.imwrite('./v1/1_cut.jpg', cutImg_o)
 
     #对裁剪的图片进行二值化和平滑处理。
     cutImg = cv2.cvtColor(cutImg_o, cv2.COLOR_RGB2GRAY)
     cutCanny = cv2.Canny(cv2.GaussianBlur(cutImg, (5, 5), 0), 50, 100)
-    cv2.imwrite('./v1/cut_Canny.jpg', cutCanny)
+    cv2.imwrite('./v1/1_cut_Canny.jpg', cutCanny)
     # kernel = np.ones((3, 3), np.float32) / 25
     # cutImg1 = cv2.filter2D(cutImg, -1, kernel) #灰度图，用于后面的圆圈识别
     cutImg1 = cv2.bilateralFilter(cutImg, 9, 70, 70)
@@ -426,16 +442,48 @@ def findMainZone(path):
     kernel = np.ones((3, 3), np.float32) / 25
     cutImg2 = cv2.filter2D(cutImg, -1, kernel) #灰度图，用于后面的圆圈识别
     cutImg = cv2.adaptiveThreshold(cutImg2, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 13, 2)
-    cv2.imwrite('./v1/cut_adapt.jpg', cutImg)
+    cv2.imwrite('./v1/1_cut_adapt.jpg', cutImg)
     return cutImg,cutCanny,cutImg_o,cutImg1
 
+# def findPointer(adaptImg):
+#     eroded = cv2.erode(adaptImg, kernel3)
+#     cv2.imwrite('./v1/2_cut_eroded.jpg', eroded)
+#
+#     sap = adaptImg.shape
+#     black_img = np.zeros([sap[0], sap[1]], np.uint8)
+#     lines = cv2.HoughLinesP(eroded, 1, np.pi / 180, 100, minLineLength=100, maxLineGap=10)
+#     lines1 = lines[:, 0, :]  # 提取为二维
+#
+#     angles1 = []
+#     for x1, y1, x2, y2 in lines1[:]:
+#         # print(x1,y1,x2,y2)
+#         if x2 - x1 != 0:
+#             thet = math.atan(abs(y2 - y1) / abs(x2 - x1)) * 180 / np.pi
+#             print(thet)
+#             if thet >= 30 and thet <= 90:
+#                 # print(thet)
+#                 angles1.append(thet)
+#                 cv2.line(black_img, (x1, y1), (x2, y2), 255, 1)
+#
+#     cv2.imwrite('./v1/2_lines.jpg', black_img)
+#     return black_img,angles1
+
+
 def findPointer(adaptImg):
-    eroded = cv2.erode(adaptImg, kernel3)
-    cv2.imwrite('./v1/cut_eroded.jpg', eroded)
+    # eroded = cv2.erode(adaptImg, kernel3)
+    # eroded = cv2.dilate(eroded, kernel4)
+    # eroded = cv2.morphologyEx(adaptImg,cv2.MORPH_OPEN,kernel3)
+    # eroded = cv2.Canny(adaptImg,50,100)
+    # eroded = cv2.dilate(eroded, kernel5)
+    # eroded = cv2.erode(eroded, kernel5)
+    eroded = adaptImg
+    eroded = cv2.dilate(eroded, kernel3)
+    cv2.imwrite('./findpointer/2_cut_eroded.jpg', eroded)
 
     sap = adaptImg.shape
     black_img = np.zeros([sap[0], sap[1]], np.uint8)
     lines = cv2.HoughLinesP(eroded, 1, np.pi / 180, 100, minLineLength=100, maxLineGap=10)
+    print(lines)
     lines1 = lines[:, 0, :]  # 提取为二维
 
     angles1 = []
@@ -443,13 +491,20 @@ def findPointer(adaptImg):
         # print(x1,y1,x2,y2)
         if x2 - x1 != 0:
             thet = math.atan(abs(y2 - y1) / abs(x2 - x1)) * 180 / np.pi
+            print(thet)
             if thet >= 30 and thet <= 90:
                 # print(thet)
                 angles1.append(thet)
                 cv2.line(black_img, (x1, y1), (x2, y2), 255, 1)
 
-    cv2.imwrite('./v1/lines.jpg', black_img)
-    return black_img,angles1
+    cv2.imwrite('./findpointer/2_lines.jpg', black_img)
+
+
+    return black_img
+
+
+
+
 
 def calcAngle(angles1):
     avgAngles = []
@@ -476,33 +531,46 @@ def calcAngle(angles1):
     for ans in angles:
         avgAngles.append(sum(ans) / len(ans))
 
-def getBigArea(none_pointer_img,hearts,need_cut):
-    eroded2 = cv2.erode(none_pointer_img, kernel3,iterations=2)
-    eroded2 = cv2.dilate(eroded2, kernel5, iterations=5)
-    cv2.imwrite('./v1/cut_dilate2.jpg', eroded2)
-    unused, numZone_adp, hearts = findContours(eroded2, need_cut, hearts, offset1=85, offset2=70)
+def getBigArea(numZone_adp,hearts):
+    # eroded2 = cv2.erode(none_pointer_img, kernel3,iterations=2)
+    # eroded2 = cv2.dilate(eroded2, kernel5, iterations=5)
+    # cv2.imwrite('./v1/cut_dilate2.jpg', eroded2)
+    # unused, numZone_adp, hearts = findContours(eroded2, need_cut, hearts, offset1=85, offset2=70)
     zoneshape = numZone_adp.shape
     numZone_adp = cv2.resize(numZone_adp, (zoneshape[1] * 8, zoneshape[0] * 8))
-    cv2.imwrite('./v1/cut_numZoneCanny.jpg', numZone_adp)
+    cv2.imwrite('./v1/7_cut_numZoneCanny.jpg', numZone_adp)
     # 极坐标转换
     polar = cv2.logPolar(numZone_adp, (hearts[0][0] * 8, hearts[0][1] * 8), 600, cv2.WARP_FILL_OUTLIERS)
     polar = cv2.rotate(polar, cv2.ROTATE_90_COUNTERCLOCKWISE)
-    cv2.imwrite('./v1/cut_polar.jpg', polar)
+    cv2.imwrite('./v1/7_cut_polar.jpg', polar)
 
     unused, numsCanny, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar, offset1=10, offset2=20)
 
     numsShape = numsCanny.shape
     numsCanny = cv2.resize(numsCanny, (numsShape[1] * 4, numsShape[0] * 4))
     threshold, numsCanny = cv2.threshold(numsCanny, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    cv2.imwrite('./v1/nums_canny.jpg', numsCanny) #直着的 带刻度带数字图
-    return numZone_adp,hearts,numsCanny,eroded2
+    cv2.imwrite('./v1/7_nums_canny.jpg', numsCanny) #直着的 带刻度带数字图
+    return numZone_adp,hearts,numsCanny
+
+def convert2Num(onehot):
+    '''
+
+    :param onehot: type nparray only
+    :return:
+    '''
+
+    p= np.where(onehot==np.max(onehot))
+    # print(onehot)
+    # print('可能性：',onehot[p])
+    return str(int(p[1][0]))
+
 
 def processBigNum(lineZone,numlines,k_pos,k_len):
 
     numsimg = lineZone[numlines[0]:numlines[1], :]
     numsdilate = cv2.erode(numsimg, kernel4, iterations=2)
     numsdilate = cv2.dilate(numsdilate, kernel5, iterations=3)
-    cv2.imwrite('./v1/numsimg.jpg', numsdilate)
+    cv2.imwrite('./v1/9_numsimg.jpg', numsdilate)
     numsArr = getEachNum(numsdilate)[0]
     nums = cutNums(numsArr, numsimg, './v1/nums/')
     index = 0
@@ -515,9 +583,8 @@ def processBigNum(lineZone,numlines,k_pos,k_len):
             new_cut = cv2.resize(new_cut, (64, 128))
             cv2.imwrite('./v1/nums/' + str(index) + '_' + str(int(i / 2)) + '.jpg', new_cut)
             # new_cut = Image.fromarray(cv2.cvtColor(new_cut, cv2.cv2.COLOR_BGR2GRAY))
-            hight, width = new_cut.shape
-            new_cut = np.asarray(new_cut, dtype='float64') / 256.
-            new_cut = new_cut.reshape(1, hight * width)[0]
+            new_cut = np.asarray(new_cut)
+            # new_cut = new_cut.reshape(1, hight * width)[0]
             tmpArr.append(new_cut)
         index += 1
         numbers_.append(tmpArr)
@@ -527,8 +594,19 @@ def processBigNum(lineZone,numlines,k_pos,k_len):
     for test in testDigits:
         res = ''
         for i in test:
-            predict = slearn.predict(i)
-            res += '-' if str(predict) == '-1' else str(predict)
+            x = cv2.resize(i,(32,64))
+            x = x.astype(float)
+            x *= (1. / 255)
+            # x = np.array([x])
+            x = x.reshape(1, 64, 32, 1)
+            pr = cnn.predict(x)
+            predict = convert2Num(pr)
+            print('cnn识别结果：',convert2Num(pr))
+            # i = i.astype(float)
+            # i /= 255
+            # i = i.reshape(1,128*64)[0]
+            # predict = slearn.predict(i)
+            res += '-' if str(predict) == '10' else str(predict)
         print('识别为:',res)
         kedu_range.append(int(res))
 
@@ -543,14 +621,14 @@ def processBigKedu(lineZone):
     lineZone = cv2.erode(lineZone, kernel3)
     numsCannyshape = lineZone.shape
     kedu = lineZone[border[2]:border[2]+500, :]
-    cv2.imwrite('./v1/nums_kedu.jpg', kedu)
+    cv2.imwrite('./v1/8_nums_kedu.jpg', kedu)
     ver = projectVertical(kedu)
     (h1, w1) = kedu.shape
     newHorizon = np.zeros([h1, w1], np.uint8)
     for i in range(0, w1):
         for j in range(0, ver[i]):
             newHorizon[j, i] = 255
-    cv2.imwrite('./v1/nums_kedu_.jpg', newHorizon)
+    cv2.imwrite('./v1/8_nums_kedu_.jpg', newHorizon)
     maxtab, mintab = peakdetective.peakdet(ver, 3)
 
     k_res = list(maxtab[:, 1])
@@ -562,40 +640,83 @@ def processBigKedu(lineZone):
 
     return border,k_pos,k_len
 
+
+
+def getScaleArea(heart_arr,_img,none_pointer_img):
+    h,w = _img.shape
+    hearts = heart_arr[:3]
+    if hearts[1][2]<hearts[2][2]:
+        tmp=hearts[1].copy()
+        hearts[1]=hearts[2]
+        hearts[2] = tmp
+    print(hearts)
+    blank_img = np.zeros((h,w),np.uint8)
+    r1=hearts[2][1]-hearts[0][1]
+    o1=hearts[2]
+    r2 = int(hearts[2][2]-r1 + hearts[1][2])
+    o2 = hearts[1]
+
+    blank_img = cv2.circle(blank_img,(o2[0],o2[1]),r2,255,-1)
+    blank_img = cv2.circle(blank_img, (o1[0], o1[1]), r1, 0, -1)
+    _img = cv2.bitwise_and(blank_img, _img)
+    none_pointer_img = cv2.bitwise_and(blank_img, none_pointer_img)
+    cv2.imwrite('./v1/5_scale_area.jpg',blank_img)
+    eroded2 = cv2.erode(_img, kernel3, iterations=1)
+    eroded2 = cv2.dilate(eroded2, kernel5, iterations=2)
+    cv2.imwrite('./v1/5_cut_dilate2.jpg', eroded2)
+    unused, numZone_adp, hearts = findContours(eroded2, _img, hearts)
+    unused, non_numZone_adp,unused = findContours(eroded2, none_pointer_img)
+    cv2.imwrite('./v1/5_cut_res.jpg', numZone_adp)
+    return numZone_adp,[hearts[1],hearts[2]],non_numZone_adp
+
+def load_cnn():
+    model_path = './cnn/num_cnn.h5'
+    K.clear_session()  # Clear previous models from memory.
+    cnn_model = load_model(model_path)
+    return cnn_model
+
+
+
 if __name__ == '__main__':
 
     #查找仪表圆形区域
-    print('查找仪表圆形区域')
-    # cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./位置3/35/image3.jpg')
-    cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./位置5/image3.jpg')
+    print('1.查找仪表圆形区域')
+    cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./位置2/30/image2.jpg')
+    # cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./位置5/image5.jpg')
+    # cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./image12.jpg')
     #查找指针位置
-    print('查找指针位置')
-    pointer_img,ang1 = findPointer(cut_Img)
+    print('2.查找指针位置')
+    pointer_img = findPointer(cut_canny)
     #指针角度计算
     # calcAngle(ang1)
     # 找圆心
-    print('找圆心')
-    heartsArr = findHearts(grayImg, cut_origin)
+    print('3.找圆心')
+    heartsArr,allArr = findHearts(grayImg, cut_origin)
     # 构建无指针图
-    print('构建无指针图')
+    print('4.构建无指针图')
     non_pointer = getNonPointer(cut_Img,pointer_img)
-    print('提前训练训练集')
-    slearn = learnNums()
+    print('5.裁剪刻度区域')
+    cut_Img,heartsArr,non_pointer=getScaleArea(allArr, cut_Img,non_pointer)
+
+
+    print('6.提前训练训练集')
+    # slearn = learnNums()
+    cnn = load_cnn()
     # 第一区域获取
-    print('第一区域获取')
-    numZoneCanny,heartsArr,bigZone,mask = getBigArea(non_pointer,heartsArr,cut_Img)
+    print('7.第一区域获取')
+    numZoneCanny,heartsArr,bigZone = getBigArea(cut_Img,heartsArr)
     # 第一区域处理，获得数字
-    print('第一区域，处理刻度')
+    print('8.第一区域，处理刻度')
     bigBorder,b_pos,b_len = processBigKedu(bigZone)
     # 第一区域，处理刻度
-    print('第一区域处理，获得数字')
+    print('9.第一区域处理，获得数字')
     processBigNum(bigZone,bigBorder,b_pos,b_len)
 
 
-    # 第二区域
-    print('第二区域')
-    scaleShape, non_polar, non_border, non_kedu_area, nums_adp_non, horiz = processNonPointer(non_pointer,mask,heartsArr[1])
-    print('第二区域，处理刻度')
+    # # 第二区域
+    print('10.第二区域')
+    scaleShape, non_polar, non_border, non_kedu_area, nums_adp_non, horiz = processNonPointer(non_pointer,heartsArr[1])
+    print('10.第二区域，处理刻度')
     s_pos,s_len =processSmallKedu(numZoneCanny,heartsArr[1],scaleShape,non_polar,non_border)
-    print('第二区域，处理数字')
+    print('11.第二区域，处理数字')
     processSmallNum(nums_adp_non,non_border,s_pos,s_len)
