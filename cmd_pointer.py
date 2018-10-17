@@ -1,3 +1,10 @@
+
+
+import argparse
+
+import sys
+
+
 import cv2
 import numpy as np
 import math
@@ -16,6 +23,13 @@ kernel5 = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
 kernel6 = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
 
 
+IMG_ERR=1
+CIRCLE_ERR=2
+MODEL_ERR=3
+getScaleArea_ERR=5
+convertPolar_ERR=6
+NUM_ERR=7
+
 def findContours(findContoursImg,dstCanny,heartsarr=None,dst=None,offset1=0,offset2=0,big_index=0):
     """
     findContours
@@ -27,6 +41,13 @@ def findContours(findContoursImg,dstCanny,heartsarr=None,dst=None,offset1=0,offs
     offset2 矩形长宽的延长
     """
     _, contours, hierarchy = cv2.findContours(findContoursImg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+
+    if len(contours)==0:
+        raise Exception('最大区域矩形检测失败！', 'line 42 in function findContours')
+
+
+
     c = sorted(contours, key=cv2.contourArea, reverse=True)
     x, y, w, h = cv2.boundingRect(c[big_index])
     new_img =None
@@ -46,40 +67,6 @@ def findContours(findContoursImg,dstCanny,heartsarr=None,dst=None,offset1=0,offs
 
 
 
-
-
-# cutImg = cv2.GaussianBlur(cutImg, (5, 5), 0)
-
-# cutImg = cv2.equalizeHist(cutImg)
-# cv2.imwrite('./findpointer/cut_enhence.jpg',cutImg)
-
-
-
-
-
-
-
-
-
-# print(avgAngles)
-
-
-# lines = cv2.HoughLines(eroded,1,np.pi/180,100)
-# lines1 = lines[:,0,:]
-#
-# for rho,theta in lines1[:]:
-#     if abs( theta) < np.pi / 6 :
-#         print('a angle is :',theta*180/np.pi,'and ',(np.pi / 2 - theta)*180/np.pi)
-#         a = np.cos(theta)
-#         b = np.sin(theta)
-#         x0 = a*rho
-#         y0 = b*rho
-#         x11 = int(x0 + 1000*(-b))
-#         y11 = int(y0 + 1000*(a))
-#         x22 = int(x0 - 1000*(-b))
-#         y22 = int(y0 - 1000*(a))
-#         cv2.line(cutImg_1,(x11,y11),(x22,y22),(0,0,255),3)
-# cv2.imwrite('./findpointer/line1.jpg',cutImg_1)
 
 
 def findHearts(src,org):
@@ -104,14 +91,21 @@ def findHearts(src,org):
 
     # src = cv2.erode(src,kernel3)
     # src = cv2.equalizeHist(src)
-    cv2.imwrite('./findpointer/cut_find_heart.jpg',src)
+    cv2.imwrite('./findpointer/2_cut_find_heart.jpg',src)
     circles2 = cv2.HoughCircles(src, cv2.HOUGH_GRADIENT, 1, 50, param1=80, param2=60, minRadius=50,maxRadius=0)
     try:
         circles2 = np.uint16(np.around(circles2))
-        if len(circles2)<3:
-            raise Exception("circle 少于 3")
-    except:
+        # print(len(circles2[0]))
+        if len(circles2[0])<3:
+            raise Exception("识别到的圆 少于 3")
+    except Exception as err:
+        print(err)
         circles2 = cv2.HoughCircles(src, cv2.HOUGH_GRADIENT, 1, 50, param1=60, param2=60, minRadius=50, maxRadius=0)
+        circles2 = np.uint16(np.around(circles2))
+
+    if len(circles2[0])<3:
+        print('未识别到准确的圆')
+        sys.exit(CIRCLE_ERR)
 
     cuto_cp = org.copy()
     for i in circles2[0,:]:
@@ -187,7 +181,7 @@ def getLineBorder(src,min_range=0):
             if src[i, j] != 0:
                 horizon[i] += 1
 
-    line_border = []
+    # line_border = []
 
     border_arr = get_border(horizon, min_range)
 
@@ -220,32 +214,7 @@ def getEachNum(src,delta=0):
 
     border_arr = get_border(vertical, delta,5)
 
-    # def getLineZone1(src, n1, n2):
-    #     for i in range(n1, n2):
-    #         # print(i)
-    #         if src[i] != 0:
-    #             t = i if i > 0 else 0
-    #             line_border.append(t)
-    #             getLineZone2(src, i, n2)
-    #             break
-    #
-    # def getLineZone2(src, n1, n2):
-    #     for i in range(n1, n2):
-    #         if src[i] == 0:
-    #             t = i if i <= n2 else n2
-    #             line_border.append(t)
-    #             getLineZone1(src, i, n2)
-    #             break
-    #         elif i >= n2:
-    #             line_border.append(n2)
-    #
-    # getLineZone1(vertical, 0, w1)
-    # # print('numborder', line_border)
-    # tmp = []
-    # for i in range(0, len(line_border), 2):
-    #     if line_border[i + 1] - line_border[i] > delta:
-    #         tmp.append(line_border[i])
-    #         tmp.append(line_border[i + 1])
+
     return border_arr, vertical
 
 
@@ -266,157 +235,6 @@ def cutNums(nums_Arr,cut,path):
 
 
 
-
-
-# all=0
-# short =0
-# for i in ver:
-#     if i != 0 and all!= 0:
-#         all+= 1
-#     elif i!= 0 and all== 0:
-#         all+= 1
-#         short = ver.index(i)
-#
-# posi = (ver.index(max(ver))-short)/all
-#
-# print('posi',posi,all,ver.index(max(ver))+1)
-
-
-
-
-
-
-# from matplotlib.pyplot import plot, scatter, show
-# plot(ver)
-# scatter(np.array(maxtab)[:, 0], np.array(maxtab)[:, 1], color='blue')
-# scatter(np.array(mintab)[:, 0], np.array(mintab)[:, 1], color='red')
-# show()
-
-
-'''
-处理小的表盘
-'''
-# def getNonPointer(cutImg,pointerImg):
-#     non_p = cv2.subtract(cutImg, cv2.dilate(pointerImg, kernel3, iterations=3))
-#     cv2.imwrite('./findpointer/non_pointer.jpg', non_p)
-#     return non_p
-
-
-# def processNonPointer(non_p,one_heart):
-#     # unused, non_numZone_adp, unused = findContours(cut_mask, non_p, offset1=85, offset2=70)
-#     zoneshape = non_p.shape
-#     non_numZone_adp = cv2.resize(non_p, (zoneshape[1] * 8, zoneshape[0] * 8))
-#     cv2.imwrite('./findpointer/x_cut_non_numZoneCanny.jpg', non_numZone_adp)
-#     polar_ = cv2.logPolar(non_numZone_adp, (one_heart[0] * 8, one_heart[1] * 8), 600, cv2.WARP_FILL_OUTLIERS)
-#     polar_ = cv2.rotate(polar_, cv2.ROTATE_90_COUNTERCLOCKWISE)
-#     cv2.imwrite('./findpointer/x_cut_polar_1_non.jpg', polar_)
-#     unused, numsCanny_non, unused1 = findContours(cv2.dilate(polar_, kernel5, iterations=2), polar_, offset1=40,
-#                                                   offset2=30, big_index=0)
-#     numsShape = numsCanny_non.shape
-#     numsCanny_non = cv2.resize(numsCanny_non, (numsShape[1] * 4, numsShape[0] * 4))
-#     threshold, numsCanny_non = cv2.threshold(numsCanny_non, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-#     numsCanny_non = cv2.erode(numsCanny_non,kernel3,iterations=1)
-#     cv2.imwrite('./findpointer/x_nums_canny1_non.jpg', numsCanny_non)
-#     line_border_, ho = getLineBorder(numsCanny_non, 20)
-#     kedu_ = numsCanny_non[line_border_[0]:line_border_[1], :]
-#     # print(ho)
-#     return numsShape,polar_,line_border_,kedu_,numsCanny_non,ho
-
-
-# def processSmallKedu(zone2polar,one_heart,numsShape,polar_,line_border_):
-#     polar = cv2.logPolar(zone2polar, (one_heart[0]*8, one_heart[1]*8), 600, cv2.WARP_FILL_OUTLIERS)
-#     polar = cv2.rotate(polar, cv2.ROTATE_90_COUNTERCLOCKWISE)
-#     cv2.imwrite('./findpointer/x_cut_polar_1.jpg',polar)
-#     unused,numsCanny_1,unused1=findContours(cv2.dilate(polar_,kernel5,iterations=2),polar,offset1=40,offset2=30,big_index=0)
-#     numsCanny_1 = cv2.resize(numsCanny_1,(numsShape[1]*4,numsShape[0]*4))
-#     cv2.imwrite('./findpointer/x_nums_canny1.jpg',numsCanny_1)
-#     kedu_1_pointer = numsCanny_1[line_border_[0]:line_border_[1]+60,:]
-#     kedu_1_pointer = cv2.erode(kedu_1_pointer,kernel3)
-#     cv2.imwrite('./findpointer/x_nums_kedu_1_pointer.jpg',kedu_1_pointer)
-#     ver_ = projectVertical(kedu_1_pointer)
-#     (h1, w1) = kedu_1_pointer.shape
-#     newHorizon_ = np.zeros([h1, w1], np.uint8)
-#
-#     for i in range(0, w1):
-#         for j in range(0, ver_[i]):
-#             newHorizon_[j, i] = 255
-#
-#     cv2.imwrite('./findpointer/x_nums_kedu_111.jpg',newHorizon_)
-#     maxtab,mintab = peakdetective.peakdet(ver_,30)
-#     # from matplotlib.pyplot import plot, scatter, show
-#     # plot(ver)
-#     # scatter(np.array(maxtab)[:, 0], np.array(maxtab)[:, 1], color='blue')
-#     # scatter(np.array(mintab)[:, 0], np.array(mintab)[:, 1], color='red')
-#     # show()
-#     k_res = list(maxtab[:,1])
-#     # print(res.index(max(res)),len(res))
-#     k_pos =  k_res.index(max(k_res))
-#     k_len = len(k_res)
-#     print('position',k_res.index(max(k_res)),'总刻度线数：',(len(k_res)-1))
-#     return k_pos,k_len
-
-#处理数字
-# def processSmallNum(numsCanny_non,line_border_,k_pos,k_len):
-#     numsimg_ = numsCanny_non[line_border_[2]:line_border_[3],:]
-#     numsimg_ = cv2.erode(numsimg_,kernel5)
-#
-#     numsdilate_ = cv2.dilate(numsimg_,kernel5,iterations=6)
-#     cv2.imwrite('./v3/xi_numsimg_.jpg',numsdilate_)
-#     numsArr_ = getEachNum(numsdilate_,60)[0]
-#
-#
-#     nums_ = cutNums(numsArr_,numsimg_,'./v3/nums1/')
-#     index_=0
-#
-#     numbers_ =[]
-#     for one_num in nums_:
-#         num_border = getEachNum(one_num)[0]
-#         tmpArr = []
-#         for i in range(0,len(num_border),2):
-#             # print(num_border[i],num_border[i+1])
-#             new_cut = one_num[:,num_border[i]:num_border[i+1]]
-#             new_cut=cv2.resize(new_cut,(64,128))
-#             cv2.imwrite('./v3/nums1/' +str(index_)+'_'+ str(int(i / 2)) + '.jpg', new_cut)
-#             # new_cut = Image.fromarray(cv2.cvtColor(new_cut, cv2.cv2.COLOR_BGR2GRAY))
-#             hight, width = new_cut.shape
-#             new_cut = np.asarray(new_cut)
-#             # new_cut = new_cut.reshape(1, hight * width)[0]
-#
-#             tmpArr.append(new_cut)
-#         index_ += 1
-#         numbers_.append(tmpArr)
-#
-#
-#
-#
-#     testDigits = [numbers_[0],numbers_[len(numbers_)-1]]
-#
-#     kedu_range = []
-#     for test in testDigits:
-#         res = ''
-#         for i in test:
-#
-#
-#             x = cv2.resize(i,(32,64))
-#             x = x.astype('float32')
-#             x /= 255
-#             x = x.reshape(1, 64, 32, 1)
-#             pr = cnn.predict(x)
-#             pr = convert2Num(pr)
-#             # convert2Num(pr)
-#             print('cnn识别结果：',pr)
-#             # i = i.astype('float32')
-#             # i /= 255
-#             # i = i.reshape(1, 128 * 64)[0]
-#             # predict = slearn.predict(i)
-#
-#             res += '-' if str(pr)=='10' else str(pr)
-#         print(res)
-#         kedu_range.append(int(res))
-#
-#     result = k_pos*(k_len-1)/(kedu_range[1]-kedu_range[0])+kedu_range[0]
-#     print('结果：',result)
-
 def learnNums():
     softmax_learn = softmax.Softmax()
     trainDigits, trainLabels = softmax_learn.loadData('./train')
@@ -424,9 +242,21 @@ def learnNums():
     return softmax_learn
 
 
+
+
 def findMainZone(path):
+    # print(path)
     img1 = cv2.imread(path)
-    img1 = cv2.resize(img1, (3000, 2000))
+    try:
+        if img1 is None:
+            raise Exception('找不到图片! 图片路径有误。')
+    except Exception as err:
+        print(err)
+        sys.exit(1)
+    img1shape = img1.shape
+    img1 = cv2.resize(img1, (int(img1shape[1]/2), int(img1shape[0]/2)))
+
+
     # canny = cv2.Canny(cv2.GaussianBlur(img1, (7, 7), 0), 100, 250)
     # cv2.imwrite('./v3/canny.jpg', canny)
 
@@ -570,7 +400,7 @@ def convertPolar(zone,_heart,type,zone2=None):
     zone = cv2.resize(zone, (zoneshape[1] * 8, zoneshape[0] * 8))
     # cv2.imwrite('./v3/6_cut_numZoneCanny.jpg', zone)
     M=zoneshape[1] * 4/math.log(_heart[2]*4)
-    print(M)
+    # print(M)
     # 极坐标转换
     polar = cv2.logPolar(zone, (_heart[0] * 8, _heart[1] * 8), M, cv2.WARP_FILL_OUTLIERS)
     polar = cv2.rotate(polar, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -580,12 +410,21 @@ def convertPolar(zone,_heart,type,zone2=None):
         zone2 = cv2.resize(zone2, (zoneshape[1] * 8, zoneshape[0] * 8))
         polar2 = cv2.logPolar(zone2, (_heart[0] * 8, _heart[1] * 8), M, cv2.WARP_FILL_OUTLIERS)
         polar2 = cv2.rotate(polar2, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-        non_area, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar, dst=polar2)
-        # print(non_area)
+        try:
+            non_area, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar, dst=polar2)
+            # print(non_area)
+        except Exception as err:
+            print(err)
+            print('line:416 in convertPolar(), please check image ./v3/5_cut_res2.jpg')
+            sys.exit(convertPolar_ERR)
 
     else:
-        unused, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar)
+        try:
+            unused, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar)
+        except Exception as err:
+            print(err)
+            print('line:423 in convertPolar(), please check image ./v3/5_cut_res1.jpg')
+            sys.exit(convertPolar_ERR)
 
     cv2.imwrite('./v3/6_cut_polar.jpg', polar)
 
@@ -601,6 +440,14 @@ def convertPolar(zone,_heart,type,zone2=None):
     if type==1:
 
         border, ho = getLineBorder(area, 20)
+        try:
+            if len(border)<3:
+                raise Exception('border less than 3 ')
+        except Exception as err:
+            print(err)
+            print('in function convertPolar please check image ./v3/6_nums_canny.jpg line :442')
+            sys.exit(convertPolar_ERR)
+
         _kedu = area[border[2]:, :]
         _num = area[border[0]:border[1],:]
     else:
@@ -608,6 +455,14 @@ def convertPolar(zone,_heart,type,zone2=None):
         threshold, non_area = cv2.threshold(non_numsCanny, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         border, ho = getLineBorder(non_area, 20)
         cv2.imwrite('./v3/6_nums_canny.jpg', non_area)  # 直着的 带刻度带数字图
+        try:
+            if len(border) < 3:
+                raise Exception('border less than 3 ')
+        except Exception as err:
+            print(err)
+            print('in function convertPolar please check image ./v3/6_nums_canny.jpg line: 456')
+            sys.exit(convertPolar_ERR)
+
         _num = area[border[2]:border[3], :]
         _kedu = area[border[0]:, :].copy()
         _kedu[border[2]-border[0]:border[3]-border[0], :]=0
@@ -631,7 +486,7 @@ def convert2Num(onehot):
     return str(int(p[1][0]))
 
 
-def processNum(numarea,k_pos,k_len,k_rate,index):
+def processNum(cnn,numarea,k_rate,index):
 
     numsimg = numarea
     numsdilate = cv2.erode(numsimg, kernel4, iterations=2)
@@ -644,7 +499,7 @@ def processNum(numarea,k_pos,k_len,k_rate,index):
     for one_num in nums:
         num_border = getEachNum(one_num)[0]
         tmpArr = []
-        res = ''
+
         for i in range(0, len(num_border), 2):
             new_cut = one_num[:, num_border[i]:num_border[i + 1]]
             new_cut = cv2.resize(new_cut, (32, 64))
@@ -665,7 +520,6 @@ def processNum(numarea,k_pos,k_len,k_rate,index):
         for i in test:
             x = i.astype(float)
             x *= (1. / 255)
-            # x = np.array([x])
             x = x.reshape(1, 64, 32, 1)
             pr = cnn.predict(x)
             pr = convert2Num(pr)
@@ -676,12 +530,20 @@ def processNum(numarea,k_pos,k_len,k_rate,index):
         #     predict = slearn.predict(i)
             res += '-' if str(pr) == '10' else str(pr)
         # print('softmax识别为:',res)
-        kedu_range.append(int(res))
+        try:
+            kedu_range.append(int(res))
+        except Exception as err:
+            print(err)
+            print('cnn 检测到'+res+' 示数检测有问题，请检查 ./v3/num'+str(index)+'文件夹中的数字')
+            sys.exit(NUM_ERR)
 
-    result = k_pos * (k_len - 1) / (kedu_range[1] - kedu_range[0]) + kedu_range[0]
+
+    # result = k_pos * (k_len - 1) / (kedu_range[1] - kedu_range[0]) + kedu_range[0]
     result2 = k_rate*(kedu_range[1] - kedu_range[0])+ kedu_range[0]
-    print('结果：',result)
+    # print('结果：',result)
     print('结果2：',result2)
+
+    return result2
 
 
 
@@ -703,7 +565,7 @@ def processKedu(zone,index):
     # print(res.index(max(res)),len(res))
     k_pos = k_res.index(max(k_res))
     k_len = len(k_res)
-    print('指针位置',k_res.index(max(k_res)), '总刻度线个数',len(k_res))
+    # print('指针位置',k_res.index(max(k_res)), '总刻度线个数',len(k_res))
     # print('position', k_res.index(max(k_res)) / (len(k_res) - 1) * 100)
 
     border1=maxtab[0][0]
@@ -712,7 +574,7 @@ def processKedu(zone,index):
     pos = maxtab[k_pos][0]
 
     rate = float(pos-border1)/(border2-border1)
-    print('比例计算：', rate)
+    # print('比例计算：', rate)
 
     return k_pos,k_len,rate
 
@@ -723,7 +585,8 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
 
     :param heart_arr: 圆心数组
     :param _img: 表盘二值图
-    :param p_img: 无指针图
+    :param non_img_1: 无指针图
+    :param _non: 无指针图
     :return:
     '''
     h,w = _img.shape
@@ -763,9 +626,18 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
 
     _hearts= hearts.copy()
 
-    cut_non1, _cutnumZone1, hearts1 = findContours(eroded1, _img1, _hearts,_non1)
-
-    cut_non2, _cutnumZone2, hearts2 = findContours(eroded2, _img2, _hearts,_non2)
+    try:
+        cut_non1, _cutnumZone1, hearts1 = findContours(eroded1, _img1, _hearts,_non1)
+    except Exception as err:
+        print(err)
+        print('in function getScaleArea line 602, please check image ./v3/5_cut_dilate1.jpg')
+        sys.exit(getScaleArea_ERR)
+    try:
+        cut_non2, _cutnumZone2, hearts2 = findContours(eroded2, _img2, _hearts,_non2)
+    except Exception as err:
+        print(err)
+        print('in function getScaleArea line 609, please check image ./v3/5_cut_dilate2.jpg')
+        sys.exit(getScaleArea_ERR)
     # unused, non_numZone_adp,unused = findContours(eroded2, none_pointer_img)
     cv2.imwrite('./v3/5_cut_res1.jpg', _cutnumZone1)
     cv2.imwrite('./v3/5_cut_res2.jpg', _cutnumZone2)
@@ -776,25 +648,37 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
 def load_cnn():
     model_path = './cnn/num_cnn.h5'
     K.clear_session()  # Clear previous models from memory.
-    cnn_model = load_model(model_path)
+    try:
+        cnn_model = load_model(model_path)
+    except:
+        print('加载模型出错')
+        sys.exit(MODEL_ERR)
     return cnn_model
 
 
 
-if __name__ == '__main__':
 
+
+
+
+
+
+
+def main(path,outPath = './result.txt'):
     #查找仪表圆形区域
     print('1.查找仪表圆形区域')
-    cut_Img,cut_origin,grayImg = findMainZone('./位置3/35/image2.jpg')
+    # print(path)
+    cut_Img,cut_origin,grayImg = findMainZone(path)
+    # cut_Img,cut_origin,grayImg = findMainZone('./位置3/35/image2.jpg')
     # cut_Img,cut_origin,grayImg = findMainZone('./位置4/image1.jpg')
     # cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./image12.jpg')
 
     # 找圆心
-    print('3.找圆心')
+    print('2.找圆心')
     heartsArr = findHearts(grayImg, cut_origin)
 
     #查找指针位置
-    print('2.查找指针位置')
+    print('3.查找指针位置')
     # pointer_img = findPointer(cut_canny)
     # pointer_img = findPointer(cut_Img,heartsArr)
     # pointer_img = findPointer(gray2,heartsArr)
@@ -802,7 +686,8 @@ if __name__ == '__main__':
     # calcAngle(ang1)
     non_img_arr = findPointer2(cut_Img, heartsArr[1:3])
 
-
+    print('4.提前加载模型')
+    cnn = load_cnn()
 
     print('5.裁剪刻度区域')
     cut_Img1,cut_Img2,heart1,heart2,non_img1,non_img2=getScaleArea(heartsArr, cut_Img,non_img_arr[0],non_img_arr[1])
@@ -812,20 +697,52 @@ if __name__ == '__main__':
     kedu1,num1 = convertPolar(cut_Img1, heart1,1)
     kedu2,num2 = convertPolar(cut_Img2, heart2,2,non_img2)
     #
-    print('提前加载模型')
-    cnn = load_cnn()
 
     print('7.第一区域kedu处理')
     pos1,len1,rate1=processKedu(kedu1,index=1)
 
     print('8.第一区域数字处理')
-    processNum(num1, pos1, len1,rate1, index=1)
+    res1=  processNum( cnn,num1,rate1, index=1)
 
     print('9.第二区域kedu处理')
     pos2, len2, rate2= processKedu(kedu2,index=2)
 
     print('10.第二区域数字处理')
-    processNum(num2, pos2, len2,rate2,index=2)
+    res2 =processNum(cnn ,num2, rate2,index=2)
+
+    f = open(outPath, 'a')
+
+    f.write('\n'+path+' 结果1：'+str(res1)+ ' 结果2：'+str(res2))
+
+    f.close()
+    print('结果输出在'+outPath)
+
+if __name__ == '__main__':
+    args = sys.argv[1:]
+    # print(args)
+    # parser = argparse.ArgumentParser(description='')
+    # parser.add_argument('--src', help='input image path')
+    # parser.add_argument('--out', help='path of result txt ')
+    # args =  parser.parse_args(args)
+    # print(args)
+
+    if len(args)==0:
+        print('请输入图片路径')
+        sys.exit(0)
+    elif len(args)==1:
+        print('图片路径：',args[0])
+        img_path = args[0]
+        main(img_path)
+    elif len(args)==2:
+        print('图片路径：', args[0])
+        print('结果保存路径：', args[1])
+        img_path = args[0]
+        out_path = args[1]
+        main(img_path,out_path)
 
 
-
+    # bl = np.zeros((300,500),np.uint8)
+    # try:
+    #     int('1-')
+    # except Exception as err:
+    #     print(err)
