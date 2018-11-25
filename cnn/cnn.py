@@ -164,7 +164,7 @@ model.compile(loss=keras.losses.categorical_crossentropy,
               optimizer=keras.optimizers.Adadelta(),
               metrics=['accuracy'])
 
-model_checkpoint = ModelCheckpoint(filepath='aaa_epoch-{epoch:02d}_loss-{loss:.4f}_val_loss-{val_loss:.4f}.h5',
+model_checkpoint = ModelCheckpoint(filepath='222_epoch-{epoch:02d}_loss-{loss:.4f}_val_loss-{val_loss:.4f}.h5',
                                    monitor='val_loss',
                                    verbose=1,
                                    save_best_only=True,
@@ -189,4 +189,4 @@ print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
 # Save model
-model.save('myCNN.h5')
+model.save('myCNN_pointer2.h5')

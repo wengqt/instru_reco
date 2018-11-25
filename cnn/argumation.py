@@ -87,10 +87,12 @@ def generator_img(src):
     i = 0
     for batch in datagen.flow(x,batch_size=1,save_to_dir='./new',save_prefix='b',save_format='jpg'):
         i +=1
-        if i > 180 :
+        if i > 20 :
             return
 
-
+for i in range(0,22):
+    path='./imgs/'+str(i)+'.jpg'
+    generator_img(path)
 
 
 # for i in range(0,8):
@@ -103,10 +105,10 @@ def generator_img(src):
 #     generator_img(path)
 
 
-for j in range(-1,10):
-    for i in range(0,1140):
-        path1 = '../train_/' + str(j) + '/_' + str(i) + '.jpg'
-        img = cv2.imread(path1)
-        img = cv2.resize(img,(32,64))
-        path2 = '../cnn_train/' + str(j) + '/' + str(i) + '.jpg'
-        cv2.imwrite(path2,img)
+# for j in range(-1,10):
+#     for i in range(0,1140):
+#         path1 = '../train_/' + str(j) + '/_' + str(i) + '.jpg'
+#         img = cv2.imread(path1)
+#         img = cv2.resize(img,(32,64))
+#         path2 = '../cnn_train/' + str(j) + '/' + str(i) + '.jpg'
+#         cv2.imwrite(path2,img)

@@ -9,7 +9,7 @@ import math
 import peakdetective
 
 from keras.models import load_model
-
+import time
 from keras import backend as K
 
 import os
@@ -265,19 +265,25 @@ def findMainZone(path):
     img1shape = img1.shape
     img1 = cv2.resize(img1, (int(img1shape[1]/2), int(img1shape[0]/2)))
 
-
-    # canny = cv2.Canny(cv2.GaussianBlur(img1, (7, 7), 0), 100, 250)
-    # cv2.imwrite(dir_path+'/canny.jpg', canny)
-
+    # img_h = cv2.resize(img1, (int(img1shape[1]/4), int(img1shape[0]/4)))
+    # # canny = cv2.Canny(cv2.GaussianBlur(img1, (7, 7), 0), 100, 250)
+    # # cv2.imwrite(dir_path+'/canny.jpg', canny)
+    #
+    # canny_h = cv2.cvtColor(img_h, cv2.COLOR_BGR2GRAY)
+    # canny_h = cv2.bilateralFilter(canny_h, 9, 70, 70)
     canny = cv2.cvtColor(cv2.GaussianBlur(img1, (7, 7), 0), cv2.COLOR_BGR2GRAY)
     # canny = cv2.cvtColor(cv2.bilateralFilter(img1, 9, 70, 70), cv2.COLOR_BGR2GRAY)
     '''
     找到仪表区域
     '''
     circles = cv2.HoughCircles(canny, cv2.HOUGH_GRADIENT, 1, 100, param1=p1, param2=p2, minRadius=50)
-    circles = np.uint16(np.around(circles))
+    if circles is None:
+        circles = cv2.HoughCircles(canny, cv2.HOUGH_GRADIENT, 1, 100, param1=70, param2=50, minRadius=50)
+
+    circles = np.uint16(np.around(circles))[0]
+    # circles = circles*np.array([2])
     img1_cp = img1.copy()
-    for i in circles[0, 0:]:
+    for i in circles[0:]:
         # 画圆圈
         cv2.circle(img1_cp, (i[0], i[1]), i[2], (0, 255, 0), 2)
         # draw the center of the circle
@@ -286,7 +292,7 @@ def findMainZone(path):
     # _circles = circles[0,:3] #投票数最大的圆
     # _circles = sorted(_circles,key=lambda x:x[2],reverse=True )
     # print(_circles)
-    the_circle = circles[0][0]
+    the_circle = circles[0]
     cv2.circle(img1_cp, (the_circle[0], the_circle[1]), the_circle[2], (0, 0, 255), 2)
     cv2.circle(img1_cp, (the_circle[0], the_circle[1]), 2, (0, 0, 255), 3)
     cv2.imwrite(dir_path+'/1_circles.jpg', img1_cp)
@@ -333,33 +339,39 @@ def findPointer2(_img,_heart):
     # _img = cv2.resize(_img,(500,500))
     _shape = _img.shape
     _img1 = _img.copy()
-    _img1 = cv2.erode(_img1, kernel3, iterations=1)
+    # _img1 = cv2.erode(_img1, kernel3, iterations=1)
     # _img1 = cv2.dilate(_img1, kernel3, iterations=1)
     _count = 0
     _imgarr=[]
+    thetas=[]
     for item in _heart:
 
         #157=pi/2*100
         mask_max = 0
         mask_theta = 0
-        for i in range(0,314):
+        start = time.clock()
+        for i in range(24,290):
             black_img = np.zeros([_shape[0], _shape[1]], np.uint8)
             theta = float(i)*0.01
-            y1 = int(item[1]-math.sin(theta)*_shape[0])
-            x1 = int(item[0]+math.cos(theta)*_shape[0])
+            y1 = int(item[1]-math.sin(theta)*item[2])
+            x1 = int(item[0]+math.cos(theta)*item[2])
             # cv2.circle(black_img, (x1, y1), 2, 255, 3)
             # cv2.circle(black_img, (item[0], item[1]), 2, 255, 3)
-            cv2.line(black_img, (item[0], item[1]), (x1, y1), 255, 3)
-
-            tmp = np.mean(cv2.bitwise_and(black_img,_img1))
+            cv2.line(black_img, (item[0], item[1]), (x1, y1), 255, 5)
+            tmp_img = cv2.bitwise_and(black_img,_img1)
+            # _, contours, hierarchy = cv2.findContours(tmp_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # c = sorted(contours, key=cv2.contourArea, reverse=True)[0]
+            # tmp = cv2.contourArea(c)
+            tmp = cv2.countNonZero(tmp_img)
             if tmp>mask_max:
                 mask_max=tmp
                 mask_theta=theta
             # cv2.imwrite(dir_path+'/2_line1.jpg', black_img)
-
+        end =  time.clock()
+        print('time',end-start)
         black_img = np.zeros([_shape[0], _shape[1]], np.uint8)
-        y1 = int(item[1] - math.sin(mask_theta) * _shape[0])
-        x1 = int(item[0] + math.cos(mask_theta) * _shape[0])
+        y1 = int(item[1] - math.sin(mask_theta) * item[2])
+        x1 = int(item[0] + math.cos(mask_theta) * item[2])
         cv2.line(black_img, (item[0], item[1]), (x1, y1), 255, 8)
         cv2.imwrite(dir_path+'/3_theta'+str(_count)+'.jpg',black_img)
         print('img', dir_path+'/3_theta'+str(_count)+'.jpg')
@@ -375,11 +387,12 @@ def findPointer2(_img,_heart):
         cv2.imwrite(dir_path+'/3_theta__' + str(_count) + '.jpg', _img)
         print('img', dir_path+'/3_theta__' + str(_count) + '.jpg')
         _imgarr.append(_img)
+        thetas.append(mask_theta)
         _count +=1
 
     cv2.imwrite(dir_path+'/3_non_pointer.jpg', _imgarr[1])
     print('img', dir_path+'/3_non_pointer.jpg')
-    return _imgarr
+    return _imgarr,thetas
 
 
 
@@ -439,7 +452,7 @@ def convertPolar(zone,_heart,type,zone2=None):
             # print(non_area)
         except Exception as err:
             print('err',err)
-            print('line:416 in convertPolar(), please check image ./v3/5_cut_res2.jpg')
+            print('line:416 in convertPolar(), please check image '+dir_path+'/5_cut_res2.jpg')
             sys.exit(convertPolar_ERR)
 
     else:
@@ -447,7 +460,7 @@ def convertPolar(zone,_heart,type,zone2=None):
             unused, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar)
         except Exception as err:
             print('err',err)
-            print('line:423 in convertPolar(), please check image ./v3/5_cut_res1.jpg')
+            print('line:423 in convertPolar(), please check image '+dir_path+'/5_cut_res1.jpg')
             sys.exit(convertPolar_ERR)
 
     cv2.imwrite(dir_path+'/6_cut_polar'+str(type)+'.jpg', polar)
@@ -465,12 +478,17 @@ def convertPolar(zone,_heart,type,zone2=None):
     if type==1:
 
         border, ho = getLineBorder(area, 20)
+
+        # for line in border:
+        #     area[line,:]=255
+        # cv2.imwrite(dir_path + '/6_nums_kedu' + str(type) + '.jpg', area)
+
         try:
             if len(border)<3:
                 raise Exception('border less than 3 ')
         except Exception as err:
             print('err',err)
-            print('in function convertPolar please check image ./v3/6_nums_canny.jpg line :442')
+            print('in function convertPolar please check image  '+dir_path+'/6_nums_kedu'+str(type)+'.jpg line :442')
             sys.exit(convertPolar_ERR)
 
         _kedu = area[border[2]:, :]
@@ -486,7 +504,7 @@ def convertPolar(zone,_heart,type,zone2=None):
                 raise Exception('border less than 3 ')
         except Exception as err:
             print('err',err)
-            print('in function convertPolar please check image ./v3/6_nums_canny.jpg line: 456')
+            print('in function convertPolar please check image  '+dir_path+'/6_nums_kedu'+str(type)+'.jpg line: 456')
             sys.exit(convertPolar_ERR)
 
         _num = area[border[2]:border[3], :]
@@ -621,13 +639,14 @@ def processKedu(zone,index):
 
 
 
-def getScaleArea(heart_arr,_img,non_img_1,_non):
+def getScaleArea(heart_arr,_img,non_img_1,_non,theta_):
     '''
 
     :param heart_arr: 圆心数组
     :param _img: 表盘二值图
     :param non_img_1: 无指针图
     :param _non: 无指针图
+    :param theta_: array 指针斜率
     :return:
     '''
     h,w = _img.shape
@@ -675,13 +694,25 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
         cut_non1, _cutnumZone1, hearts1 = findContours(eroded1, _img1, _hearts,_non1)
     except Exception as err:
         print('err',err)
-        print('in function getScaleArea line 602, please check image ./v3/5_cut_dilate1.jpg')
+        print('in function getScaleArea line 602, please check image  '+dir_path+'/5_cut_dilate1.jpg')
         sys.exit(getScaleArea_ERR)
     try:
         cut_non2, _cutnumZone2, hearts2 = findContours(eroded2, _img2, _hearts,_non2)
+
+        point = hearts2[2][:2]
+        _shape = _cutnumZone2.shape
+        theta = theta_[1]
+        y1 = int(point[1] - math.sin(theta) * _shape[0]*2)
+        x1 = int(point[0] + math.cos(theta) * _shape[0]*2)
+        # cv2.circle(black_img, (x1, y1), 2, 255, 3)
+        # cv2.circle(black_img, (item[0], item[1]), 2, 255, 3)
+        cv2.line(_cutnumZone2, (point[0], point[1]), (x1, y1), 255, 2)
+
+
+
     except Exception as err:
         print('err',err)
-        print('in function getScaleArea line 609, please check image ./v3/5_cut_dilate2.jpg')
+        print('in function getScaleArea line 609, please check image  '+dir_path+'/5_cut_dilate2.jpg')
         sys.exit(getScaleArea_ERR)
     # unused, non_numZone_adp,unused = findContours(eroded2, none_pointer_img)
     cv2.imwrite(dir_path+'/5_cut_res1.jpg', _cutnumZone1)
@@ -695,7 +726,8 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
     return _cutnumZone1,_cutnumZone2,hearts1[1],hearts2[2],cut_non1,cut_non2
 
 def load_cnn():
-    model_path = './cnn/num_cnn.h5'
+    # model_path = './cnn/num_cnn.h5'
+    model_path = './cnn/myCNN_pointer2.h5'
     K.clear_session()  # Clear previous models from memory.
     try:
         cnn_model = load_model(model_path)
@@ -717,49 +749,74 @@ def main(path,outPath = './result.txt'):
 
 
     #查找仪表圆形区域
+    time1 = time.clock()
     print('1.查找仪表圆形区域')
     # print(path)
     cut_Img,cut_origin,grayImg,gray_origin = findMainZone(path)
+    time2 = time.clock()
+    print('耗时：',time2-time1)
     # cut_Img,cut_origin,grayImg = findMainZone('./位置3/35/image2.jpg')
     # cut_Img,cut_origin,grayImg = findMainZone('./位置4/image1.jpg')
     # cut_Img,cut_canny,cut_origin,grayImg = findMainZone('./image12.jpg')
 
     # 找圆心
+    time1 = time.clock()
     print('2.找圆心')
     heartsArr = findHearts(gray_origin, cut_origin)
-
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
     #查找指针位置
+    time1 = time.clock()
     print('3.查找指针位置')
     # pointer_img = findPointer(cut_canny)
     # pointer_img = findPointer(cut_Img,heartsArr)
     # pointer_img = findPointer(gray2,heartsArr)
     #指针角度计算
     # calcAngle(ang1)
-    non_img_arr = findPointer2(cut_Img, heartsArr[1:3])
+    non_img_arr,theta_arr = findPointer2(cut_Img, heartsArr[1:3])
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     print('4.提前加载模型')
     cnn = load_cnn()
 
+    time1 = time.clock()
     print('5.裁剪刻度区域')
-    cut_Img1,cut_Img2,heart1,heart2,non_img1,non_img2=getScaleArea(heartsArr, cut_Img,non_img_arr[0],non_img_arr[1])
+    cut_Img1,cut_Img2,heart1,heart2,non_img1,non_img2=getScaleArea(heartsArr, cut_Img,non_img_arr[0],non_img_arr[1],theta_arr)
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     # print(heart1,heart2)
     print('6.进行极坐标转换')
+    time1 = time.clock()
     kedu1,num1 = convertPolar(cut_Img1, heart1,1)
     kedu2,num2 = convertPolar(cut_Img2, heart2,2,non_img2)
-    #
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     print('7.第一区域kedu处理')
+    time1 = time.clock()
     pos1,len1,rate1=processKedu(kedu1,index=1)
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     print('8.第一区域数字处理')
+    time1 = time.clock()
     res1=  processNum( cnn,num1,rate1, index=1)
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     print('9.第二区域kedu处理')
+    time1 = time.clock()
     pos2, len2, rate2= processKedu(kedu2,index=2)
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     print('10.第二区域数字处理')
+    time1 = time.clock()
     res2 =processNum(cnn ,num2, rate2,index=2)
+    time2 = time.clock()
+    print('耗时：', time2 - time1)
 
     f = open(outPath, 'a')
 
@@ -788,14 +845,14 @@ if __name__ == '__main__':
     try:
         args.index('p2')
     except:
-        p2 = 50
+        p2 = 60
     else:
         p2 = int(args[args.index('p2') + 1])
 
     try:
         args.index('p3')
     except:
-        p3 = 20
+        p3 = 100
     else:
         p3 = int(args[args.index('p3') + 1])
 

@@ -1,19 +1,22 @@
 
 
-import argparse
-
 import sys
-import os
+
 
 import cv2
 import numpy as np
 import math
 import peakdetective
-
+import tensorflow
 from keras.models import load_model
+import platform
 
 from keras import backend as K
 
+import os
+
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 kernel1 = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 50))
 kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT, (80, 80))
@@ -23,12 +26,20 @@ kernel5 = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
 kernel6 = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
 
 
+
+
+
 IMG_ERR=1
 CIRCLE_ERR=2
 MODEL_ERR=3
 getScaleArea_ERR=5
 convertPolar_ERR=6
 NUM_ERR=7
+
+def imwrite(_path,_img):
+    cv2.imencode('.jpg',_img)[1].tofile(_path)
+
+
 
 def findContours(findContoursImg,dstCanny,heartsarr=None,dst=None,offset1=0,offset2=0,big_index=0):
     """
@@ -55,7 +66,7 @@ def findContours(findContoursImg,dstCanny,heartsarr=None,dst=None,offset1=0,offs
         # cv2.rectangle(dst, (x-offset1, y-offset1), (x + w+offset2, y + h+offset2), (0, 255, 0), 2)
         new_img = dst[y-offset1:y + h+offset2,x-offset1:x + w+offset2]
     new_img_canny = dstCanny[y-offset1:y + h+offset2,x-offset1:x + w+offset2]
-    cv2.imwrite('./v3/cut_findContours.jpg', new_img_canny)
+    imwrite(dir_path+'/cut_findContours.jpg', new_img_canny)
     _heart= None
     if heartsarr is not None:
         _heart = heartsarr.copy()
@@ -91,7 +102,8 @@ def findHearts(src,org):
 
     # src = cv2.erode(src,kernel3)
     # src = cv2.equalizeHist(src)
-    cv2.imwrite('./v3/2_cut_find_heart.jpg',src)
+    imwrite(dir_path+'/2_cut_find_heart.jpg',src)
+    print('img',dir_path+'/2_cut_find_heart.jpg')
     circles2 = cv2.HoughCircles(src, cv2.HOUGH_GRADIENT, 1, 50, param1=80, param2=60, minRadius=50,maxRadius=0)
     try:
 
@@ -101,12 +113,12 @@ def findHearts(src,org):
 
         circles2 = np.uint16(np.around(circles2))
     except Exception as err:
-        print(err)
+        print('err',err)
         circles2 = cv2.HoughCircles(src, cv2.HOUGH_GRADIENT, 1, 50, param1=60, param2=60, minRadius=50, maxRadius=0)
         circles2 = np.uint16(np.around(circles2))
 
     if len(circles2[0])<3 or circles2 is None:
-        print('未识别到准确的圆')
+        print('err','未识别到准确的圆')
         sys.exit(CIRCLE_ERR)
 
     cuto_cp = org.copy()
@@ -123,14 +135,15 @@ def findHearts(src,org):
         # draw the center of the circle
         cv2.circle(cuto_cp,(onecircle[0],onecircle[1]),2,(0,0,255),3)
 
-    cv2.imwrite('./v3/2_cut_Circles.jpg',cuto_cp)
+    imwrite(dir_path+'/2_cut_Circles.jpg',cuto_cp)
+    print('img', dir_path+'/2_cut_Circles.jpg')
     '''
     找到圆心位置之后，可以进行极坐标转换：
     参考 https://zhuanlan.zhihu.com/p/30827442
     '''
     # polar = cv2.logPolar(eroded, (circles2[0][1][0], circles2[0][1][1]), 150, cv2.WARP_FILL_OUTLIERS)
     # polar = cv2.rotate(polar, cv2.ROTATE_90_COUNTERCLOCKWISE)
-    # cv2.imwrite('./findpointer/cut_polar.jpg', polar)
+    # imwrite('./findpointer/cut_polar.jpg', polar)
 
     hearts = circles2[0][:3]
     if hearts[1][2] < hearts[2][2]:
@@ -185,7 +198,7 @@ def getLineBorder(src,min_range=0):
 
     # line_border = []
 
-    border_arr = get_border(horizon, min_range,20)
+    border_arr = get_border(horizon, min_range,p3)
 
 
     return border_arr,horizon
@@ -214,7 +227,7 @@ def getEachNum(src,delta=0):
     vertical = projectVertical(src)
     line_border = []
 
-    border_arr = get_border(vertical, delta,8)
+    border_arr = get_border(vertical, delta,p4)
 
 
     return border_arr, vertical
@@ -228,7 +241,8 @@ def cutNums(nums_Arr,cut,path):
         new_cut = cut[:,nums_Arr[i]:nums_Arr[i+1]]
         cut_num.append(new_cut)
         # new_cut = cv2.erode(new_cut, kernel5)
-        cv2.imwrite(path+str(int(i/2))+'.jpg', new_cut)
+        imwrite(path+str(int(i/2))+'.jpg', new_cut)
+        # print('img', path+str(int(i/2))+'.jpg')
 
     return cut_num
 
@@ -247,13 +261,18 @@ def cutNums(nums_Arr,cut,path):
 
 
 def findMainZone(path):
-    # print(path)
-    img1 = cv2.imread(path)
+    if platform.system() == 'Windows':
+        # path = path.encode('utf-8') 
+        # path = path.decode()
+        img1 = cv2.imdecode(np.fromfile(path, dtype=np.uint8),cv2.IMREAD_COLOR)
+        # img1 = cv2.cvtColor(img1,cv2.COLOR_RGB2BGR)
+    else:
+        img1 = cv2.imread(path)
     try:
         if img1 is None:
             raise Exception('找不到图片! 图片路径有误。')
     except Exception as err:
-        print(err)
+        # print(err)
         print('err', err)
         sys.exit(1)
     img1shape = img1.shape
@@ -261,13 +280,14 @@ def findMainZone(path):
 
 
     # canny = cv2.Canny(cv2.GaussianBlur(img1, (7, 7), 0), 100, 250)
-    # cv2.imwrite('./v3/canny.jpg', canny)
+    # imwrite(dir_path+'/canny.jpg', canny)
 
     canny = cv2.cvtColor(cv2.GaussianBlur(img1, (7, 7), 0), cv2.COLOR_BGR2GRAY)
+    # canny = cv2.cvtColor(cv2.bilateralFilter(img1, 9, 70, 70), cv2.COLOR_BGR2GRAY)
     '''
     找到仪表区域
     '''
-    circles = cv2.HoughCircles(canny, cv2.HOUGH_GRADIENT, 1, 100, param1=80, param2=50, minRadius=50)
+    circles = cv2.HoughCircles(canny, cv2.HOUGH_GRADIENT, 1, 100, param1=p1, param2=p2, minRadius=50)
     circles = np.uint16(np.around(circles))
     img1_cp = img1.copy()
     for i in circles[0, 0:3]:
@@ -282,8 +302,8 @@ def findMainZone(path):
     the_circle = circles[0][0]
     cv2.circle(img1_cp, (the_circle[0], the_circle[1]), the_circle[2], (0, 0, 255), 2)
     cv2.circle(img1_cp, (the_circle[0], the_circle[1]), 2, (0, 0, 255), 3)
-    cv2.imwrite('./v3/1_circles.jpg', img1_cp)
-    # print('img', '/v3/1_circles.jpg')
+    imwrite(dir_path+'/1_circles.jpg', img1_cp)
+    print('img', dir_path+'/1_circles.jpg')
     # print(the_circle[1],the_circle[2])
     # print(int(the_circle[1]) - int(the_circle[2]))
     d1 =0 if int(the_circle[1]) - int(the_circle[2])<0 else int(the_circle[1]) - int(the_circle[2])
@@ -292,15 +312,15 @@ def findMainZone(path):
                d2:the_circle[0] + the_circle[2]]
     gray_o = canny[d1:the_circle[1] + the_circle[2],
                d2:the_circle[0] + the_circle[2]]
-    cv2.imwrite('./v3/1_cut.jpg', cutImg_o)
-    # print('img', '/v3/1_cut.jpg')
+    imwrite(dir_path+'/1_cut.jpg', cutImg_o)
+    print('img', dir_path+'/1_cut.jpg')
 
     #对裁剪的图片进行二值化和平滑处理。
     cutImg = cv2.cvtColor(cutImg_o, cv2.COLOR_RGB2GRAY)
     # cut_g = cv2.GaussianBlur(cutImg, (7, 7), 1)
     # cut_g = cv2.equalizeHist(cut_g)
     # cutCanny = cv2.Canny(cut_g, 50, 100)
-    # cv2.imwrite('./v3/1_cut_Canny.jpg', cutCanny)
+    # imwrite(dir_path+'/1_cut_Canny.jpg', cutCanny)
     # kernel = np.ones((3, 3), np.float32) / 25
     # cutImg1 = cv2.filter2D(cutImg, -1, kernel) #灰度图，用于后面的圆圈识别
     cutImg1 = cv2.bilateralFilter(cutImg, 9, 70, 70)
@@ -310,8 +330,8 @@ def findMainZone(path):
 
     cutImg3 = cv2.adaptiveThreshold(cutImg2, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 13, 2)
     # ret2, cutImg3 = cv2.threshold(cutImg2, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    cv2.imwrite('./v3/1_cut_adapt.jpg', cutImg3)
-    # print('img', '/v3/1_cut_adapt.jpg')
+    imwrite(dir_path+'/1_cut_adapt.jpg', cutImg3)
+    print('img', dir_path+'/1_cut_adapt.jpg')
     return cutImg3,cutImg_o,cutImg1,gray_o
 
 
@@ -348,13 +368,14 @@ def findPointer2(_img,_heart):
             if tmp>mask_max:
                 mask_max=tmp
                 mask_theta=theta
-            # cv2.imwrite('./v3/2_line1.jpg', black_img)
+            # imwrite(dir_path+'/2_line1.jpg', black_img)
 
         black_img = np.zeros([_shape[0], _shape[1]], np.uint8)
         y1 = int(item[1] - math.sin(mask_theta) * _shape[0])
         x1 = int(item[0] + math.cos(mask_theta) * _shape[0])
         cv2.line(black_img, (item[0], item[1]), (x1, y1), 255, 8)
-        cv2.imwrite('./v3/3_theta'+str(_count)+'.jpg',black_img)
+        imwrite(dir_path+'/3_theta'+str(_count)+'.jpg',black_img)
+        print('img', dir_path+'/3_theta'+str(_count)+'.jpg')
         #
         # black_img1 = np.zeros([_shape[0], _shape[1]], np.uint8)
         # r = item[2]-20 if item[2]==_heart[1][2] else _heart[1][2]+ _heart[0][1]-_heart[1][1]-20
@@ -364,11 +385,13 @@ def findPointer2(_img,_heart):
 
         _img = cv2.subtract(_img,black_img)
         _img1 = cv2.subtract(_img1,black_img)
-        cv2.imwrite('./v3/3_theta__' + str(_count) + '.jpg', _img)
+        imwrite(dir_path+'/3_theta__' + str(_count) + '.jpg', _img)
+        print('img', dir_path+'/3_theta__' + str(_count) + '.jpg')
         _imgarr.append(_img)
         _count +=1
 
-    cv2.imwrite('./v3/3_non_pointer.jpg', _imgarr[1])
+    imwrite(dir_path+'/3_non_pointer.jpg', _imgarr[1])
+    print('img', dir_path+'/3_non_pointer.jpg')
     return _imgarr
 
 
@@ -412,7 +435,7 @@ def calcAngle(angles1):
 def convertPolar(zone,_heart,type,zone2=None):
     zoneshape = zone.shape
     zone = cv2.resize(zone, (zoneshape[1] * 8, zoneshape[0] * 8))
-    # cv2.imwrite('./v3/6_cut_numZoneCanny.jpg', zone)
+    # imwrite(dir_path+'/6_cut_numZoneCanny.jpg', zone)
     M=zoneshape[1] * 4/math.log(_heart[2]*4)
     # print(M)
     # 极坐标转换
@@ -428,27 +451,28 @@ def convertPolar(zone,_heart,type,zone2=None):
             non_area, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar, dst=polar2)
             # print(non_area)
         except Exception as err:
-            print(err)
-            print('line:416 in convertPolar(), please check image ./v3/5_cut_res2.jpg')
+            print('err',err)
+            print('line:416 in convertPolar(), please check image  '+dir_path+'/5_cut_res2.jpg')
             sys.exit(convertPolar_ERR)
 
     else:
         try:
             unused, area, unused1 = findContours(cv2.dilate(polar, kernel5, iterations=1), polar)
         except Exception as err:
-            print(err)
-            print('line:423 in convertPolar(), please check image ./v3/5_cut_res1.jpg')
+            print('err',err)
+            print('line:423 in convertPolar(), please check image  '+dir_path+'/5_cut_res1.jpg')
             sys.exit(convertPolar_ERR)
 
-    cv2.imwrite('./v3/6_cut_polar.jpg', polar)
+    imwrite(dir_path+'/6_cut_polar'+str(type)+'.jpg', polar)
+    print('img', dir_path+'/6_cut_polar'+str(type)+'.jpg')
 
 
     numsShape = area.shape
     numsCanny = cv2.resize(area, (numsShape[1] * 4, numsShape[0] * 4))
 
     threshold, area = cv2.threshold(numsCanny, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    cv2.imwrite('./v3/6_nums_canny.jpg', area)  # 直着的 带刻度带数字图
-
+    imwrite(dir_path+'/6_nums_kedu'+str(type)+'.jpg', area)  # 直着的 带刻度带数字图
+    print('img', dir_path+'/6_nums_kedu'+str(type)+'.jpg')
 
 
     if type==1:
@@ -458,8 +482,8 @@ def convertPolar(zone,_heart,type,zone2=None):
             if len(border)<3:
                 raise Exception('border less than 3 ')
         except Exception as err:
-            print(err)
-            print('in function convertPolar please check image ./v3/6_nums_canny.jpg line :442')
+            print('err',err)
+            print('in function convertPolar please check image '+dir_path+'/6_nums_kedu'+str(type)+'.jpg line :442')
             sys.exit(convertPolar_ERR)
 
         _kedu = area[border[2]:, :]
@@ -468,21 +492,24 @@ def convertPolar(zone,_heart,type,zone2=None):
         non_numsCanny = cv2.resize(non_area, (numsShape[1] * 4, numsShape[0] * 4))
         threshold, non_area = cv2.threshold(non_numsCanny, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         border, ho = getLineBorder(non_area, 20)
-        cv2.imwrite('./v3/6_nums_canny.jpg', non_area)  # 直着的 带刻度带数字图
+        imwrite(dir_path+'/6_nums_kedu'+str(type)+'.jpg', non_area)  # 直着的 带刻度带数字图
+        print('img', dir_path+'/6_nums_kedu'+str(type)+'.jpg')
         try:
             if len(border) < 3:
                 raise Exception('border less than 3 ')
         except Exception as err:
-            print(err)
-            print('in function convertPolar please check image ./v3/6_nums_canny.jpg line: 456')
+            print('err',err)
+            print('in function convertPolar please check image  '+dir_path+'/6_nums_kedu'+str(type)+'.jpg line: 456')
             sys.exit(convertPolar_ERR)
 
         _num = area[border[2]:border[3], :]
         _kedu = area[border[0]:, :].copy()
         _kedu[border[2]-border[0]:border[3]-border[0], :]=0
 
-    cv2.imwrite('./v3/6_nums_'+str(type)+'.jpg', _num)  # 直着的 带刻度带数字图
-    cv2.imwrite('./v3/6_kedu_'+str(type)+'.jpg', _kedu)  # 直着的 带刻度带数字图
+    imwrite(dir_path+'/6_nums_'+str(type)+'.jpg', _num)  # 直着的 带刻度带数字图
+    print('img', dir_path+'/6_nums_'+str(type)+'.jpg')
+    imwrite(dir_path+'/6_kedu_'+str(type)+'.jpg', _kedu)  # 直着的 带刻度带数字图
+    print('img', dir_path+'/6_kedu_'+str(type)+'.jpg')
     return _kedu,_num
 
 
@@ -504,32 +531,32 @@ def processNum(cnn,numarea,k_rate,index):
 
     numsimg = numarea
     numsdilate = cv2.erode(numsimg, kernel4, iterations=2)
-    numsdilate = cv2.dilate(numsdilate, kernel5, iterations=3)
-    cv2.imwrite('./v3/9_numsdilate.jpg', numsdilate)
+    numsdilate = cv2.dilate(numsdilate, kernel9, iterations=3)
+    imwrite(dir_path+'/9_numsdilate'+str(index)+'.jpg', numsdilate)
+    print('img', dir_path+'/9_numsdilate'+str(index)+'.jpg')
     numsArr = getEachNum(numsdilate)[0]
-    numsimg = cv2.erode(numsimg, kernel4, iterations=1)
-    nums = cutNums(numsArr, numsimg, './v3/num'+str(index)+'/')
+    numsimg = cv2.erode(numsimg, kernel8, iterations=1)
+    nums = cutNums(numsArr, numsimg, dir_path+'/num'+str(index)+'/')
     _index = 0
     numbers_ = []
-
-
     for one_num in nums:
         num_border = getEachNum(one_num)[0]
         tmpArr = []
 
-        maxWidth = 0
+        maxWidth=0
         for i in range(0, len(num_border), 2):
-            _width = num_border[i + 1] - num_border[i]
-            if _width > maxWidth:
-                maxWidth = _width
+            _width = num_border[i + 1]-num_border[i]
+            if _width>maxWidth:
+                maxWidth=_width
 
         for i in range(0, len(num_border), 2):
+
             new_cut = one_num[:, num_border[i]:num_border[i + 1]]
-            blank = np.zeros((new_cut.shape[0], maxWidth), np.uint8)
+            blank = np.zeros((new_cut.shape[0],maxWidth),np.uint8)
             # print(new_cut.shape,blank.shape)
-            blank[:, blank.shape[1] - new_cut.shape[1]:blank.shape[1]] = new_cut
+            blank[:,blank.shape[1]-new_cut.shape[1]:blank.shape[1]]=new_cut
             new_cut = cv2.resize(blank, (32, 64))
-            cv2.imwrite('./v3/num'+str(index)+'/' + str(_index) + '_' + str(int(i / 2)) + '.jpg', new_cut)
+            imwrite(dir_path+'/num'+str(index)+'/' + str(_index) + '_' + str(int(i / 2)) + '.jpg', new_cut)
 
             # new_cut = Image.fromarray(cv2.cvtColor(new_cut, cv2.cv2.COLOR_BGR2GRAY))
             # hight, width = new_cut.shape
@@ -559,7 +586,7 @@ def processNum(cnn,numarea,k_rate,index):
         try:
             kedu_range.append(int(res))
         except Exception as err:
-            print(err)
+            print('err',err)
             print('cnn 检测到'+res+' 示数检测有问题，请检查 ./v3/num'+str(index)+'文件夹中的数字')
             sys.exit(NUM_ERR)
 
@@ -567,7 +594,7 @@ def processNum(cnn,numarea,k_rate,index):
     # result = k_pos * (k_len - 1) / (kedu_range[1] - kedu_range[0]) + kedu_range[0]
     result2 = k_rate*(kedu_range[1] - kedu_range[0])+ kedu_range[0]
     # print('结果：',result)
-    print('结果2：',result2)
+    print('res',result2)
 
     return result2
 
@@ -582,7 +609,8 @@ def processKedu(zone,index):
     for i in range(0, w1):
         for j in range(0, ver[i]):
             newHorizon[j, i] = 255
-    cv2.imwrite('./v3/7_nums_kedu_'+str(index)+'.jpg', newHorizon)
+    imwrite(dir_path+'/7_nums_kedu_'+str(index)+'.jpg', newHorizon)
+    print('img', dir_path+'/7_nums_kedu_'+str(index)+'.jpg')
     maxtab, mintab = peakdetective.peakdet(ver, 3)
 
     # print(maxtab)
@@ -634,10 +662,12 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
     blank_img2 = cv2.circle(blank_img0, (o1[0], o1[1]), r1, 0, -1)
 
     _img1 = cv2.bitwise_and(blank_img1, _img)
-    cv2.imwrite('./v3/5_area1.jpg', _img1)
+    imwrite(dir_path+'/5_area1.jpg', _img1)
+    print('img', dir_path+'/5_area1.jpg')
 
     _img2 = cv2.bitwise_and(blank_img2, non_img_1)
-    cv2.imwrite('./v3/5_area2.jpg', _img2)
+    imwrite(dir_path+'/5_area2.jpg', _img2)
+    print('img', dir_path+'/5_area2.jpg')
 
 
     _non1 = cv2.bitwise_and(_non, blank_img1)
@@ -645,30 +675,36 @@ def getScaleArea(heart_arr,_img,non_img_1,_non):
 
     eroded1 = cv2.erode(_img1, kernel3, iterations=1)
     eroded1 = cv2.dilate(eroded1, kernel5, iterations=2)
-    cv2.imwrite('./v3/5_cut_dilate1.jpg', eroded1)
+    imwrite(dir_path+'/5_cut_dilate1.jpg', eroded1)
+    print('img', dir_path+'/5_cut_dilate1.jpg')
     eroded2 = cv2.erode(_img2, kernel3, iterations=1)
     eroded2 = cv2.dilate(eroded2, kernel5, iterations=2)
-    cv2.imwrite('./v3/5_cut_dilate2.jpg', eroded2)
+    imwrite(dir_path+'/5_cut_dilate2.jpg', eroded2)
+    print('img', dir_path+'/5_cut_dilate2.jpg')
 
     _hearts= hearts.copy()
 
     try:
         cut_non1, _cutnumZone1, hearts1 = findContours(eroded1, _img1, _hearts,_non1)
     except Exception as err:
-        print(err)
-        print('in function getScaleArea line 602, please check image ./v3/5_cut_dilate1.jpg')
+        print('err',err)
+        print('in function getScaleArea line 602, please check image  '+dir_path+'/5_cut_dilate1.jpg')
         sys.exit(getScaleArea_ERR)
     try:
         cut_non2, _cutnumZone2, hearts2 = findContours(eroded2, _img2, _hearts,_non2)
     except Exception as err:
-        print(err)
-        print('in function getScaleArea line 609, please check image ./v3/5_cut_dilate2.jpg')
+        print('err',err)
+        print('in function getScaleArea line 609, please check image  '+dir_path+'/5_cut_dilate2.jpg')
         sys.exit(getScaleArea_ERR)
     # unused, non_numZone_adp,unused = findContours(eroded2, none_pointer_img)
-    cv2.imwrite('./v3/5_cut_res1.jpg', _cutnumZone1)
-    cv2.imwrite('./v3/5_cut_res2.jpg', _cutnumZone2)
-    cv2.imwrite('./v3/5_cut_p_img1.jpg', cut_non1)
-    cv2.imwrite('./v3/5_cut_p_img2.jpg', cut_non2)
+    imwrite(dir_path+'/5_cut_res1.jpg', _cutnumZone1)
+    print('img', dir_path+'/5_cut_res1.jpg')
+    imwrite(dir_path+'/5_cut_res2.jpg', _cutnumZone2)
+    print('img', dir_path+'/5_cut_res2.jpg')
+    imwrite(dir_path+'/5_cut_p_img1.jpg', cut_non1)
+    print('img', dir_path+'/5_cut_p_img1.jpg')
+    imwrite(dir_path+'/5_cut_p_img2.jpg', cut_non2)
+    print('img', dir_path+'/5_cut_p_img2.jpg')
     return _cutnumZone1,_cutnumZone2,hearts1[1],hearts2[2],cut_non1,cut_non2
 
 def load_cnn():
@@ -677,7 +713,7 @@ def load_cnn():
     try:
         cnn_model = load_model(model_path)
     except:
-        print('加载模型出错')
+        print('err','加载模型出错')
         sys.exit(MODEL_ERR)
     return cnn_model
 
@@ -691,6 +727,8 @@ def load_cnn():
 
 
 def main(path,outPath = './result.txt'):
+
+
     #查找仪表圆形区域
     print('1.查找仪表圆形区域')
     # print(path)
@@ -743,7 +781,6 @@ def main(path,outPath = './result.txt'):
     f.close()
     print('结果输出在'+outPath)
 
-
 if __name__ == '__main__':
     args = sys.argv[1:]
     # print(args)
@@ -753,34 +790,106 @@ if __name__ == '__main__':
     # args =  parser.parse_args(args)
     # print(args)
 
-    if len(args)==0:
-        print('请输入图片路径')
-        sys.exit(0)
-    elif len(args)==1:
-        print('图片文件夹路径：',args[0])
-        img_path = args[0]
-        files = os.listdir(img_path)  # 获取目录下的所有文件名
-        for file in files:  # 遍历所有文件
-            filename = file.split('.')
-            if filename[len(filename)-1]=='jpg' or filename[len(filename)-1]=='jpeg':
-                print('处理：',file)
-                main(img_path+'/'+file)
-            else:
-                print('err',file+'不是jpg格式图片')
-    elif len(args)==2:
+
+    try:
+        args.index('p1')
+    except:
+        p1 = 80
+    else:
+        p1 =int(args[args.index('p1') + 1])
+
+    try:
+        args.index('p2')
+    except:
+        p2 = 50
+    else:
+        p2 = int(args[args.index('p2') + 1])
+
+    try:
+        args.index('p3')
+    except:
+        p3 = 20
+    else:
+        p3 = int(args[args.index('p3') + 1])
+
+    try:
+        args.index('p4')
+    except:
+        p4 = 8
+    else:
+        p4 = int(args[args.index('p4') + 1])
+
+    try:
+        args.index('p5')
+    except:
+        p5 = 4
+    else:
+        p5 = int(args[args.index('p5') + 1])
+
+    try:
+        args.index('p6')
+    except:
+        p6 = 10
+    else:
+        p6 = int(args[args.index('p6') + 1])
+
+    kernel8 = cv2.getStructuringElement(cv2.MORPH_RECT, (p5, p5))
+    kernel9 = cv2.getStructuringElement(cv2.MORPH_RECT, (p6, p6))
+
+    try:
+        args.index('out')
+    except:
+        if len(args) == 0:
+            print('请输入图片路径')
+            sys.exit(0)
+        elif len(args) >= 1:
+            print('图片路径：', args[0])
+            img_path = args[0]
+            dir_path_arr =img_path.split(os.path.sep)[:-1]
+            filename = img_path.split(os.path.sep)[-1].split('.')[0]
+            dir_path = os.path.sep.join(dir_path_arr) +os.path.sep + filename
+            isExists = os.path.exists(dir_path)
+            if not isExists:
+                os.makedirs(dir_path)
+                os.makedirs(dir_path+'/num1')
+                os.makedirs(dir_path+'/num2')
+            main(img_path)
+    else:
+        out_path = args[args.index('out') + 1]
         print('图片路径：', args[0])
-        print('结果保存路径：', args[1])
+        print('结果保存路径：', out_path)
         img_path = args[0]
-        out_path = args[1]
-        files = os.listdir(img_path)  # 获取目录下的所有文件名
-        for file in files:  # 遍历所有文件
-            filename = file.split('.')
-            if filename[len(filename) - 1] == '.jpg' or filename[len(filename) - 1] == '.jpeg':
-                main(img_path + '/' + file,out_path)
+        dir_path_arr = img_path.split(os.path.sep)[:-1]
+        filename = img_path.split(os.path.sep)[-1].split('.')[0]
+        dir_path = os.path.sep.join(dir_path_arr)+os.path.sep+filename
+        isExists = os.path.exists(dir_path)
+        if not isExists:
+            os.makedirs(dir_path)
+            os.makedirs(dir_path + '/num1')
+            os.makedirs(dir_path + '/num2')
+        main(img_path, out_path)
+
+
+    # if len(args) == 0:
+    #     print('请输入图片路径')
+    #     sys.exit(0)
+    # elif len(args) == 1:
+    #     print('图片路径：', args[0])
+    #     img_path = args[0]
+    #     main(img_path)
+    # elif len(args) == 2:
+    #     print('图片路径：', args[0])
+    #     print('结果保存路径：', args[1])
+    #     img_path = args[0]
+    #     out_path = args[1]
+    #     main(img_path, out_path)
+
+
+
 
 
     # bl = np.zeros((300,500),np.uint8)
     # try:
     #     int('1-')
     # except Exception as err:
-    #     print(err)
+    #     print('err',err)
