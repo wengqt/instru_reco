@@ -19,7 +19,7 @@ kernel1 = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 50))
 kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT, (80, 80))
 kernel3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 kernel4 = cv2.getStructuringElement(cv2.MORPH_RECT, (4, 4))
-kernel5 = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
+kernel5 = cv2.getStructuringElement(cv2.MORPH_RECT, (12, 12))
 kernel6 = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
 
 

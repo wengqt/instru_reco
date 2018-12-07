@@ -4,6 +4,7 @@ from numpy import NaN, Inf, arange, isscalar, asarray, array
 
 def peakdet(v, delta, x=None):
     """
+    delta 相邻两个的高度差
     Converted from MATLAB script at http://billauer.co.il/peakdet.html
 
     Returns two arrays
@@ -77,7 +78,7 @@ def peakdet(v, delta, x=None):
 if __name__ == "__main__":
     from matplotlib.pyplot import plot, scatter, show
 
-    series = [0, 0, 0, 2,1,3, 0, 0, 0, -2, 0, 0, 0, 2, 0, 0, 0, -2, 0]
+    series = [0, 0, 0, 3,2,1, 0, 0, 0, -2, 0, 0, 0, 2, 0, 0, 0, -2, 0]
     maxtab, mintab = peakdet(series, 2)
     plot(series)
     scatter(array(maxtab)[:, 0], array(maxtab)[:, 1], color='blue')
