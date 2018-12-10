@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 import math
 import peakdetective
-import tensorflow
 from keras.models import load_model
 import platform
 
