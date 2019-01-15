@@ -261,7 +261,7 @@ def cutNums(nums_Arr,cut,path):
 
 def findMainZone(path):
     if platform.system() == 'Windows':
-        # path = path.encode('utf-8') 
+        # path = path.encode('utf-8')
         # path = path.decode()
         img1 = cv2.imdecode(np.fromfile(path, dtype=np.uint8),cv2.IMREAD_COLOR)
         # img1 = cv2.cvtColor(img1,cv2.COLOR_RGB2BGR)
@@ -348,6 +348,7 @@ def findPointer2(_img,_heart):
     # _img = cv2.resize(_img,(500,500))
     _shape = _img.shape
     _img1 = _img.copy()
+    org = _img.copy()
     # _img1 = cv2.erode(_img1, kernel3, iterations=1)
     # _img1 = cv2.dilate(_img1, kernel3, iterations=1)
     _count = 0
@@ -358,6 +359,7 @@ def findPointer2(_img,_heart):
         #157=pi/2*100
         mask_max = 0
         mask_theta = 0
+        # tmp_arr = []
         for i in range(24,290):
             black_img = np.zeros([_shape[0], _shape[1]], np.uint8)
             theta = float(i)*0.01
@@ -367,12 +369,35 @@ def findPointer2(_img,_heart):
             # cv2.circle(black_img, (item[0], item[1]), 2, 255, 3)
             cv2.line(black_img, (item[0], item[1]), (x1, y1), 255, 5)
             tmp_img = cv2.bitwise_and(black_img, _img1)
-            tmp = cv2.countNonZero(tmp_img)
+            tmp = cv2.countNonZero(tmp_img)/cv2.countNonZero(black_img)
+            # tmp_arr.append(tmp)
             if tmp>mask_max:
                 mask_max=tmp
                 mask_theta=theta
             # imwrite(dir_path+'/2_line1.jpg', black_img)
 
+        if mask_max <0.28 and len(thetas)==1:
+
+            for i in range(24, 290):
+                black_img = np.zeros([_shape[0], _shape[1]], np.uint8)
+                theta = float(i) * 0.01
+                y1 = int(item[1] - math.sin(theta) * item[2])
+                x1 = int(item[0] + math.cos(theta) * item[2])
+                # cv2.circle(black_img, (x1, y1), 2, 255, 3)
+                # cv2.circle(black_img, (item[0], item[1]), 2, 255, 3)
+                cv2.line(black_img, (item[0], item[1]), (x1, y1), 255, 5)
+                tmp_img = cv2.bitwise_and(black_img, org)
+                tmp = cv2.countNonZero(tmp_img) / cv2.countNonZero(black_img)
+                # tmp_arr.append(tmp)
+                if tmp > mask_max:
+                    mask_max = tmp
+                    mask_theta = theta
+
+        # from matplotlib.pyplot import plot, scatter, show
+        # # a_ = [x for x in range(24,290)]
+        # plot(tmp_arr)
+        # # scatter(np.array(a_), np.array(tmp_arr), color='red')
+        # show()
         black_img = np.zeros([_shape[0], _shape[1]], np.uint8)
         y1 = int(item[1] - math.sin(mask_theta) * item[2])
         x1 = int(item[0] + math.cos(mask_theta) * item[2])

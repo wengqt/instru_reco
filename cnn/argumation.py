@@ -66,13 +66,13 @@ import numpy as np
 def generator_img(src):
     datagen = ImageDataGenerator(
                 rotation_range=5,
-                width_shift_range=0.1,
-                height_shift_range=0.1,
+                width_shift_range=0.05,
+                height_shift_range=0.05,
                 rescale=1./255,
-                shear_range=0.05,
-                zoom_range=0.05,
+                # shear_range=0.05,
+                zoom_range=[1.0,1.1],
                 # horizontal_flip=True,
-                fill_mode='nearest')
+                fill_mode='constant')
 
     # 打印转换前的图片
     img = load_img(src)
@@ -85,13 +85,13 @@ def generator_img(src):
 
     # 这里人工设置停止生成， 并保存图片用于可视化
     i = 0
-    for batch in datagen.flow(x,batch_size=1,save_to_dir='./new',save_prefix='b',save_format='jpg'):
+    for batch in datagen.flow(x,batch_size=1,save_to_dir='./9a',save_prefix='b',save_format='jpg'):
         i +=1
-        if i > 20 :
+        if i > 10:
             return
 
-for i in range(0,22):
-    path='./imgs/'+str(i)+'.jpg'
+for i in range(0,320):
+    path='./cnn_num/0/a'+str(i)+'.jpg'
     generator_img(path)
 
 

@@ -17,7 +17,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 batch_size = 128
 num_classes = 11
-epochs = 12
+epochs = 20
 
 # input image dimensions
 img_rows, img_cols = 64, 32
@@ -33,21 +33,21 @@ def load_image():
     train_label=[]
     test_img=[]
     test_label=[]
-    with open('../cnn_train/train.txt') as f:
+    with open('/Users/weng/Documents/大四/NumInstrument/train32/train.txt') as f:
         for line in f.readlines():
             pos = line.split(' ')[0]
             index = int(line.split(' ')[1])
-            img = cv2.imread('../cnn_train/' + pos,0)
+            img = cv2.imread('/Users/weng/Documents/大四/NumInstrument/train32/' + pos,0)
             # print(img)
             train_img.append(img)
             train_label.append(index)
             # img.close()
     f.close()
-    with open('../cnn_train/val.txt') as f:
+    with open('/Users/weng/Documents/大四/NumInstrument/train32/val.txt') as f:
         for line in f.readlines():
             pos = line.split(' ')[0]
             index = int(line.split(' ')[1])
-            img = cv2.imread('../cnn_train/' + pos,0)
+            img = cv2.imread('/Users/weng/Documents/大四/NumInstrument/train32/' + pos,0)
             test_img.append(img)
             test_label.append(index)
             # img.close()
@@ -164,7 +164,7 @@ model.compile(loss=keras.losses.categorical_crossentropy,
               optimizer=keras.optimizers.Adadelta(),
               metrics=['accuracy'])
 
-model_checkpoint = ModelCheckpoint(filepath='222_epoch-{epoch:02d}_loss-{loss:.4f}_val_loss-{val_loss:.4f}.h5',
+model_checkpoint = ModelCheckpoint(filepath='num_11_epoch-{epoch:02d}_loss-{loss:.4f}_val_loss-{val_loss:.4f}.h5',
                                    monitor='val_loss',
                                    verbose=1,
                                    save_best_only=True,
@@ -189,4 +189,4 @@ print('Test loss:', score[0])
 print('Test accuracy:', score[1])
 
 # Save model
-model.save('myCNN_pointer2.h5')
+model.save('myCNN_num_new11.h5')
